@@ -1,0 +1,21 @@
+{
+    "name": "andrewhood125/financial",
+    "description": "How are your finances?",
+    "type": "project",
+    "require": {
+        "symfony/console": "~2.6",
+        "symfony/yaml": "~2.6"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Andrew Hood",
+            "email": "andrewhood125@gmail.com"
+        }
+    ],
+    "autoload": {
+      "psr-4": {
+        "Financial\\": "src/"
+      }
+    }
+}

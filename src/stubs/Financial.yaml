@@ -1,0 +1,8 @@
+'loans':
+  - 'name': '2015 Acura MDX'
+    'apr': 4.0
+    'balance': 43870
+
+  - 'name': 'Student Loan'
+    'apr': 5.4
+    'balance': 49000
