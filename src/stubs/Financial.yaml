@@ -1,3 +1,20 @@
+income: 9700
+
+expenses:
+  car insurance: 100
+  rent: 1000
+
+investments:
+  - name: Retirement
+    apr: 6.0
+    balance: 0
+    contribution: 520
+
+  - name: Savings
+    apr: 1.0
+    balance: 0
+    contribution: 250
+
 loans:
   - name: 2015 Acura MDX
     apr: 4.0
