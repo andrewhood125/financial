@@ -1,14 +1,26 @@
-income: 9700
+income:
+  amount: 4000
+  apr: 4
+
+date: 
+  month: 04
+  day: 30
+  year: 2015
 
 expenses:
   car insurance: 100
-  rent: 1000
+  phone: 140
+  health insurance: 200
+  internet: 25
+  rent: 500
+  food: 500
+  utilities: 200
 
 investments:
   - name: Retirement
     apr: 6.0
     balance: 0
-    contribution: 520
+    contribution: 300
 
   - name: Savings
     apr: 1.0
@@ -16,10 +28,12 @@ investments:
     contribution: 250
 
 loans:
-  - name: 2015 Acura MDX
-    apr: 4.0
-    balance: 43870
+  - name: Car
+    apr: 13.15
+    balance: 10000
+    payment: 230
 
   - name: Student Loan
-    apr: 5.4
-    balance: 49000
+    apr: 6.8
+    balance: 30000
+    payment: 500

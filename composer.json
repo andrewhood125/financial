@@ -4,7 +4,8 @@
     "type": "project",
     "require": {
         "symfony/console": "~2.6",
-        "symfony/yaml": "~2.6"
+        "symfony/yaml": "~2.6",
+        "nesbot/carbon": "~1.18"
     },
     "license": "MIT",
     "authors": [
