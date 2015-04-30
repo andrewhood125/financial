@@ -18,5 +18,8 @@
       "psr-4": {
         "Financial\\": "src/"
       }
+    },
+    "require-dev": {
+        "fabpot/php-cs-fixer": "~1.7"
     }
 }
