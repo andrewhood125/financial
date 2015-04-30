@@ -4,9 +4,6 @@
 require 'vendor/autoload.php';
 
 use Financial\Commands;
-use Symfony\Component\Yaml\Yaml;
-
-$yaml = Yaml::parse(file_get_contents('Financial.yaml'));
 
 $app = new Symfony\Component\Console\Application('Financial', '0.0.0');
 
