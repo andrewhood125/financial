@@ -1,4 +1,4 @@
-<?php namespace Financial;
+<?php namespace Financial\Commands;
 
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;  
@@ -25,7 +25,7 @@ class InitCommand extends Command {
    * @return void
    */
   public function execute(InputInterface $input, OutputInterface $output) {
-    copy(__DIR__.'/stubs/Financial.yaml', __DIR__.'/../Financial.yaml');
+    copy(__DIR__.'/../stubs/Financial.yaml', __DIR__.'/../../Financial.yaml');
 
     $output->writeln('Financial.yaml created!');
   }
