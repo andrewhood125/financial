@@ -1,145 +1,153 @@
-<?php namespace Financial\Outlook;
+<?php
+
+namespace Financial\Outlook;
 
 use Symfony\Component\Yaml\Yaml;
 use Carbon\Carbon;
 
-class Outlook {
+class Outlook
+{
+    public $surplus = 0;
 
-  public $surplus = 0;
+    public function __construct($months)
+    {
+        date_default_timezone_set('UTC');
+        $yaml = Yaml::parse(file_get_contents(__DIR__.'/../../Financial.yaml'));
+        $this->carbon = Carbon::createFromDate($yaml['date']['year'], $yaml['date']['month'], $yaml['date']['day']);
+        $this->months = $months;
+        $this->income = $yaml['income']['amount'];
+        $this->raise = $yaml['income']['apr'];
+        $this->expenses = $yaml['expenses'];
+        $this->investments = $yaml['investments'];
+        $this->loans = $yaml['loans'];
 
-  public function __construct($months) {
-    date_default_timezone_set("UTC");
-    $yaml = Yaml::parse(file_get_contents(__DIR__ .'/../../Financial.yaml'));
-    $this->carbon = Carbon::createFromDate($yaml['date']['year'], $yaml['date']['month'], $yaml['date']['day']);
-    $this->months = $months;
-    $this->income = $yaml['income']['amount'];
-    $this->raise = $yaml['income']['apr'];
-    $this->expenses = $yaml['expenses'];
-    $this->investments = $yaml['investments'];
-    $this->loans = $yaml['loans'];
-
-    $this->initInvestments();
-    $this->initLoans();
-    $this->outlook();
-  }
-
-  public function initInvestments() {
-    foreach($this->investments as &$investment) {
-      $investment['mpr'] = $investment['apr']/12;
-      $investment['history'] = [];
-    }
-  }
-
-  public function initLoans() {
-    foreach($this->loans as &$loan) {
-      $loan['mpr'] = $loan['apr']/12;
-      $loan['history'] = [];
-    }
-  }
-
-  public function outlook() {
-
-    for($i = 0; $i < $this->months; $i++) {
-      // get a raise
-      if($i > 0 && $i % 12 == 0) {
-        $this->income += $this->income * $this->raise/100;
-      }
-
-      $date = $this->carbon->toDateString();
-      $income = $this->income;
-
-      // pay expenses
-      foreach($this->expenses as $expense) {
-        $income -= $expense;
-      }
-
-      // pay loans
-      foreach($this->loans as &$loan) {
-        if($loan['balance'] <= 0) continue;
-
-        // calculate interest
-        $interest = $loan['mpr']/100 * $loan['balance'];
-
-        // compound interest
-        $loan['balance'] += $interest;
-
-        // calculate payment
-        $payment = ( $loan['balance'] < $loan['payment'] ? $loan['balance'] : $loan['payment']);
-
-        // apply payment
-        $income -= $payment;
-        $loan['balance'] -= $payment;
-
-        // add history
-        $loan['history'][$i] = [
-          'date' => $date,
-          'balance' => $loan['balance'],
-          'interest' => $interest
-        ];
-      }
-
-      // make investments
-      foreach($this->investments as &$investment) {
-
-        // calculate interest
-        $interest = $investment['mpr']/100 * $investment['balance'];
-
-        // compound interest
-        $investment['balance'] += $interest;
-
-        // apply payment
-        $income -= $investment['contribution'];
-        $investment['balance'] += $investment['contribution'];
-
-        // add history
-        $investment['history'][$i] = [
-          'date' => $date,
-          'balance' => $investment['balance'],
-          'interest' => $interest
-        ];
-      }
-
-
-      // handle surplus income
-      $this->surplus += $income;
-
-      // increment month
-      $this->carbon->addMonth();
+        $this->initInvestments();
+        $this->initLoans();
+        $this->outlook();
     }
 
-  }
-
-  public function __toString() {
-    $string = "";
-
-    // Add income
-    $string .= "Income:\t\t" . $this->income . "\n";
-
-    // Add surplus
-    $string .= "Surplus:\t" . $this->surplus . "\n";
-
-    // Add loans
-    $string .= "Loans:\n";
-    foreach($this->loans as $loan) {
-      $string .= "\n\tname:\t\t" . $loan['name'] . "\n";
-      $string .= "\tapr:\t\t" . $loan['apr'] . "\n";
-      // loan paid off
-      if(count($loan['history']) < $this->months) {
-        $string .= "\tstatus:\t\tPaid off after " . count($loan['history']) . " months.\n";
-      } else {
-        $string .= "\tbalance:\t" . $loan['balance'] . "\n";
-      }
+    public function initInvestments()
+    {
+        foreach ($this->investments as &$investment) {
+            $investment['mpr'] = $investment['apr'] / 12;
+            $investment['history'] = [];
+        }
     }
 
-    // Add investments
-    $string .= "\nInvestments:\n";
-    foreach($this->investments as $investment) {
-      $string .= "\n\tname:\t\t" . $investment['name'] . "\n";
-      $string .= "\tapr:\t\t" . $investment['apr'] . "\n";
-      $string .= "\tbalance:\t" . $investment['balance'] . "\n";
+    public function initLoans()
+    {
+        foreach ($this->loans as &$loan) {
+            $loan['mpr'] = $loan['apr'] / 12;
+            $loan['history'] = [];
+        }
     }
 
-    return $string;
-    //return print_r($this, true);
-  }
+    public function outlook()
+    {
+        for ($i = 0; $i < $this->months; $i++) {
+
+            // Pay Raise Once A Year
+            if ($i > 0 && $i % 12 == 0) {
+                $this->income += $this->income * $this->raise / 100;
+            }
+
+            $date = $this->carbon->toDateString();
+            $income = $this->income;
+
+            // pay expenses
+            foreach ($this->expenses as $expense) {
+                $income -= $expense;
+            }
+
+            // pay loans
+            foreach ($this->loans as &$loan) {
+
+                if ($loan['balance'] <= 0) {
+                    continue;
+                }
+
+                // calculate interest
+                $interest = $loan['mpr'] / 100 * $loan['balance'];
+
+                // compound interest
+                $loan['balance'] += $interest;
+
+                // calculate payment
+                $payment = ($loan['balance'] < $loan['payment'] ? $loan['balance'] : $loan['payment']);
+
+                // apply payment
+                $income -= $payment;
+                $loan['balance'] -= $payment;
+
+                // add history
+                $loan['history'][$i] = [
+                    'date' => $date,
+                    'balance' => $loan['balance'],
+                    'interest' => $interest,
+                ];
+            }
+
+            // make investments
+            foreach ($this->investments as &$investment) {
+
+                // calculate interest
+                $interest = $investment['mpr'] / 100 * $investment['balance'];
+
+                // compound interest
+                $investment['balance'] += $interest;
+
+                // apply payment
+                $income -= $investment['contribution'];
+                $investment['balance'] += $investment['contribution'];
+
+                // add history
+                $investment['history'][$i] = [
+                    'date' => $date,
+                    'balance' => $investment['balance'],
+                    'interest' => $interest,
+                ];
+            }
+
+            // handle surplus income
+            $this->surplus += $income;
+
+            // increment month
+            $this->carbon->addMonth();
+        }
+    }
+
+    public function __toString()
+    {
+        $string = '';
+
+        // Add income
+        $string .= "Income:\t\t".$this->income."\n";
+
+        // Add surplus
+        $string .= "Surplus:\t".$this->surplus."\n";
+
+        // Add loans
+        $string .= "Loans:\n";
+        foreach ($this->loans as $loan) {
+            $string .= "\n\tname:\t\t".$loan['name']."\n";
+            $string .= "\tapr:\t\t".$loan['apr']."\n";
+            // loan paid off
+            if (count($loan['history']) < $this->months) {
+                $string .= "\tstatus:\t\tPaid off after ".count($loan['history'])." months.\n";
+            } else {
+                $string .= "\tbalance:\t".$loan['balance']."\n";
+            }
+        }
+
+        // Add investments
+        $string .= "\nInvestments:\n";
+        foreach ($this->investments as $investment) {
+            $string .= "\n\tname:\t\t".$investment['name']."\n";
+            $string .= "\tapr:\t\t".$investment['apr']."\n";
+            $string .= "\tbalance:\t".$investment['balance']."\n";
+        }
+
+        return $string;
+        //return print_r($this, true);
+    }
 }
