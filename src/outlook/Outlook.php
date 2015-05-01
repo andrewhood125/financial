@@ -61,7 +61,6 @@ class Outlook
 
             // pay loans
             foreach ($this->loans as &$loan) {
-
                 if ($loan['balance'] <= 0) {
                     continue;
                 }
@@ -108,11 +107,67 @@ class Outlook
                 ];
             }
 
-            // handle surplus income
-            $this->surplus += $income;
+            $this->handleSurplusIncome($income);
 
-            // increment month
             $this->carbon->addMonth();
+        }
+    }
+
+    public function &worstLoan()
+    {
+        $apr = 0;
+        $worst_loan;
+        foreach ($this->loans as &$loan) {
+            if ($loan['balance'] > 0 && $loan['apr'] > $apr) {
+                $apr = $loan['apr'];
+                $worst_loan = &$loan;
+            }
+        }
+
+        return $worst_loan;
+    }
+
+    public function &bestInvestment()
+    {
+        $apr = 0;
+        $best_investment;
+        foreach ($this->investments as &$investment) {
+            if ($investment['apr'] > $apr) {
+                $apr = $investment['apr'];
+                $best_investment = &$investment;
+            }
+        }
+
+        return $best_investment;
+    }
+
+    public function paymentTo(&$balance, $amount)
+    {
+        $payment = $amount;
+
+        if ($amount > $balance) {
+            $payment = $balance;
+        }
+
+        $balance += $payment;
+
+        return $amount - $payment;
+    }
+
+    public function handleSurplusIncome($surplus_income)
+    {
+        if ($account = &$this->worstLoan() !== null) {
+            $remainder = $this->paymentTo($account['balance'], $surplus_income * -1);
+            if ($remainder > 0) {
+                $this->handleSurplusIncome($remainder);
+            }
+        } elseif ($account = &$this->bestInvestment() !== null) {
+            $remainder = $this->paymentTo($account['balance'], $surplus_income);
+            if ($remainder > 0) {
+                $this->handleSurplusIncome($remainder);
+            }
+        } else {
+            $this->surplus += $surplus_income;
         }
     }
 
