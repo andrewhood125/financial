@@ -8,6 +8,7 @@ use Carbon\Carbon;
 class Outlook
 {
     public $surplus = 0;
+    public $history = [];
 
     public function __construct($months)
     {
@@ -30,7 +31,7 @@ class Outlook
     {
         foreach ($this->investments as &$investment) {
             $investment['mpr'] = $investment['apr'] / 12;
-            $investment['history'] = [];
+            $investment['total_interest'] = 0;
         }
     }
 
@@ -38,20 +39,23 @@ class Outlook
     {
         foreach ($this->loans as &$loan) {
             $loan['mpr'] = $loan['apr'] / 12;
-            $loan['history'] = [];
+            $loan['original_balance'] = $loan['balance'];
+            $loan['total_interest'] = 0;
         }
     }
 
     public function outlook()
     {
         for ($i = 0; $i < $this->months; $i++) {
+            $this->date = $this->carbon->toDateString();
+            $this_day_in_history = [];
 
             // Pay Raise Once A Year
             if ($i > 0 && $i % 12 == 0) {
                 $this->income += $this->income * $this->raise / 100;
+                $this_day_in_history['pay_raise'] = $this->income;
             }
 
-            $date = $this->carbon->toDateString();
             $income = $this->income;
 
             // pay expenses
@@ -61,52 +65,51 @@ class Outlook
 
             // pay loans
             foreach ($this->loans as &$loan) {
+                $loan_history = [];
                 if ($loan['balance'] <= 0) {
                     continue;
                 }
 
                 // calculate interest
                 $interest = $loan['mpr'] / 100 * $loan['balance'];
+                $loan_history['interest'] = $interest;
+                $loan['total_interest'] += $interest;
 
                 // compound interest
                 $loan['balance'] += $interest;
+                $loan_history['balance'] = $loan['balance'];
 
                 // calculate payment
                 $payment = ($loan['balance'] < $loan['payment'] ? $loan['balance'] : $loan['payment']);
+                $loan_history['payment'] = $payment;
 
                 // apply payment
                 $income -= $payment;
                 $loan['balance'] -= $payment;
-
-                // add history
-                $loan['history'][$i] = [
-                    'date' => $date,
-                    'balance' => $loan['balance'],
-                    'interest' => $interest,
-                ];
+                $this_day_in_history[$loan['name']] = $loan_history;
             }
 
             // make investments
             foreach ($this->investments as &$investment) {
+                $investment_history = [];
 
                 // calculate interest
                 $interest = $investment['mpr'] / 100 * $investment['balance'];
+                $investment['total_interest'] += $interest;
+                $investment_history['interest'] = $interest;
 
                 // compound interest
                 $investment['balance'] += $interest;
+                $investment_history['balance'] = $investment['balance'];
 
                 // apply payment
                 $income -= $investment['contribution'];
                 $investment['balance'] += $investment['contribution'];
 
-                // add history
-                $investment['history'][$i] = [
-                    'date' => $date,
-                    'balance' => $investment['balance'],
-                    'interest' => $interest,
-                ];
+                $this_day_in_history[$investment['name']] = $investment_history;
             }
 
+            $this->history[$this->date] = $this_day_in_history;
             $this->handleSurplusIncome($income);
 
             $this->carbon->addMonth();
@@ -153,6 +156,8 @@ class Outlook
 
         return $amount - $payment;
     }
+
+
 
     public function handleSurplusIncome($surplus_income)
     {
@@ -202,7 +207,7 @@ class Outlook
             $string .= "\tbalance:\t".$investment['balance']."\n";
         }
 
-        return $string;
-        //return print_r($this, true);
+        //return $string;
+        return print_r($this, true);
     }
 }
