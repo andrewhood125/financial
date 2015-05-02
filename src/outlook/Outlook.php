@@ -106,7 +106,12 @@ class Outlook
                 $this_day_in_history[$investment['name']] = $investment_history;
             }
 
+            $this_day_in_history['surplus'] = [
+                'balance' => $this->income 
+            ];
+
             $this->history[$this->date] = $this_day_in_history;
+
             $this->handleSurplusIncome($this->income);
 
             $this->carbon->addMonth();
@@ -190,6 +195,20 @@ class Outlook
     public function __toString()
     {
         $string = '';
+
+        // Add history
+        foreach($this->history as $date => $month) {
+            $string .= $date . "\n";
+            foreach($month as $name => $account) {
+                $string .= "\n\t" . $name . ":\n\t\t";
+                foreach($account as $key => $value) {
+                    $string .= sprintf("\t%s: $%'#6.2f", $key, $value);
+                }
+                $string .= "\n";
+            }
+
+            $string .= "----------------------------------------------------------------------------------------------------------------------\n\n";
+        }
 
         // Add income
         $string .= "Income:\t\t".$this->original_income."\n";
