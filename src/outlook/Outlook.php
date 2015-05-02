@@ -16,7 +16,7 @@ class Outlook
         $yaml = Yaml::parse(file_get_contents(__DIR__.'/../../Financial.yaml'));
         $this->carbon = Carbon::createFromDate($yaml['date']['year'], $yaml['date']['month'], $yaml['date']['day']);
         $this->months = $months;
-        $this->income = $yaml['income']['amount'];
+        $this->original_income = $yaml['income']['amount'];
         $this->raise = $yaml['income']['apr'];
         $this->expenses = $yaml['expenses'];
         $this->investments = $yaml['investments'];
@@ -41,6 +41,7 @@ class Outlook
             $loan['mpr'] = $loan['apr'] / 12;
             $loan['original_balance'] = $loan['balance'];
             $loan['total_interest'] = 0;
+            $loan['total_payments'] = 0;
         }
     }
 
@@ -52,20 +53,23 @@ class Outlook
 
             // Pay Raise Once A Year
             if ($i > 0 && $i % 12 == 0) {
-                $this->income += $this->income * $this->raise / 100;
-                $this_day_in_history['pay_raise'] = $this->income;
+                $this->original_income += $this->original_income * $this->raise / 100;
+                $this_day_in_history['pay_raise'] = $this->original_income;
             }
 
-            $income = $this->income;
+            $this->income = $this->original_income;
 
             // pay expenses
             foreach ($this->expenses as $expense) {
-                $income -= $expense;
+                $this->income -= $expense;
             }
 
             // pay loans
             foreach ($this->loans as &$loan) {
-                $loan_history = [];
+                $loan_history = [
+                    'payment' => 0,
+                ];
+
                 if ($loan['balance'] <= 0) {
                     continue;
                 }
@@ -79,13 +83,8 @@ class Outlook
                 $loan['balance'] += $interest;
                 $loan_history['balance'] = $loan['balance'];
 
-                // calculate payment
-                $payment = ($loan['balance'] < $loan['payment'] ? $loan['balance'] : $loan['payment']);
-                $loan_history['payment'] = $payment;
+                $this->paymentTo($loan, $loan['payment'] * -1, $loan_history);
 
-                // apply payment
-                $income -= $payment;
-                $loan['balance'] -= $payment;
                 $this_day_in_history[$loan['name']] = $loan_history;
             }
 
@@ -102,15 +101,13 @@ class Outlook
                 $investment['balance'] += $interest;
                 $investment_history['balance'] = $investment['balance'];
 
-                // apply payment
-                $income -= $investment['contribution'];
-                $investment['balance'] += $investment['contribution'];
+                $this->paymentTo($investment, $investment['contribution'], $investment_history);
 
                 $this_day_in_history[$investment['name']] = $investment_history;
             }
 
             $this->history[$this->date] = $this_day_in_history;
-            $this->handleSurplusIncome($income);
+            $this->handleSurplusIncome($this->income);
 
             $this->carbon->addMonth();
         }
@@ -144,30 +141,44 @@ class Outlook
         return $best_investment;
     }
 
-    public function paymentTo(&$balance, $amount)
+    public function paymentTo(&$account, $amount, &$history)
     {
         $payment = $amount;
 
-        if ($amount > $balance) {
-            $payment = $balance;
+        if (abs($amount) > $account['balance']) {
+            $payment = $account['balance'] * -1;
+            $account['paid_off'] = $this->date;
         }
 
-        $balance += $payment;
+        $this->income -= abs($payment);
+        $account['balance'] += $payment;
+        $account['total_payments'] += abs($payment);
+        $history['balance'] = $account['balance'];
+        $history['payment'] += abs($payment);
 
-        return $amount - $payment;
+        return abs($amount) - abs($payment);
     }
 
+    public function invest(&$account, $amount, &$history)
+    {
+        $this->income -= $amount;
+        $account['balance'] += $amount;
+        $account['total_payments'] += $amount;
+        $history['balance'] = $account['balance'];
+        $history['payment'] += $amount;
 
+        return 0;
+    }
 
     public function handleSurplusIncome($surplus_income)
     {
         if ($account = &$this->worstLoan() !== null) {
-            $remainder = $this->paymentTo($account['balance'], $surplus_income * -1);
+            $remainder = $this->paymentTo($account, $surplus_income * -1, $this->history[$this->date][$account['name']]);
             if ($remainder > 0) {
                 $this->handleSurplusIncome($remainder);
             }
         } elseif ($account = &$this->bestInvestment() !== null) {
-            $remainder = $this->paymentTo($account['balance'], $surplus_income);
+            $remainder = $this->invest($account, $surplus_income, $this->history[$this->date][$account['name']]);
             if ($remainder > 0) {
                 $this->handleSurplusIncome($remainder);
             }
@@ -181,7 +192,7 @@ class Outlook
         $string = '';
 
         // Add income
-        $string .= "Income:\t\t".$this->income."\n";
+        $string .= "Income:\t\t".$this->original_income."\n";
 
         // Add surplus
         $string .= "Surplus:\t".$this->surplus."\n";
@@ -191,9 +202,12 @@ class Outlook
         foreach ($this->loans as $loan) {
             $string .= "\n\tname:\t\t".$loan['name']."\n";
             $string .= "\tapr:\t\t".$loan['apr']."\n";
+            $string .= "\ttotal payments:\t".$loan['total_payments']."\n";
+            $string .= "\ttotal interest:\t".$loan['total_interest']."\n";
+
             // loan paid off
-            if (count($loan['history']) < $this->months) {
-                $string .= "\tstatus:\t\tPaid off after ".count($loan['history'])." months.\n";
+            if (array_key_exists('paid_off', $loan)) {
+                $string .= "\tstatus:\t\tPaid off on ".$loan['paid_off']."\n";
             } else {
                 $string .= "\tbalance:\t".$loan['balance']."\n";
             }
@@ -207,7 +221,7 @@ class Outlook
             $string .= "\tbalance:\t".$investment['balance']."\n";
         }
 
-        //return $string;
-        return print_r($this, true);
+        return $string;
+        //return print_r($this->history, true);
     }
 }
