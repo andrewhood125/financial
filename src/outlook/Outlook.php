@@ -101,7 +101,7 @@ class Outlook
                 $investment['balance'] += $interest;
                 $investment_history['balance'] = $investment['balance'];
 
-                $this->paymentTo($investment, $investment['contribution'], $investment_history);
+                $this->invest($investment, $investment['contribution'], $investment_history);
 
                 $this_day_in_history[$investment['name']] = $investment_history;
             }
