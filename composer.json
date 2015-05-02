@@ -21,5 +21,8 @@
     },
     "require-dev": {
         "fabpot/php-cs-fixer": "~1.7"
-    }
+    },
+    "bin": [
+      "financial"
+    ]
 }

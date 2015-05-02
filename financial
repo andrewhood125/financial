@@ -5,7 +5,7 @@ require 'vendor/autoload.php';
 
 use Financial\Commands;
 
-$app = new Symfony\Component\Console\Application('Financial', '2.0.0');
+$app = new Symfony\Component\Console\Application('Financial', '2.0.1');
 
 $app->add(new Commands\InitCommand);
 $app->add(new Commands\OutlookCommand);
