@@ -25,7 +25,7 @@ class Outlook
         $this->outlook();
     }
 
-    public function initInvestments()
+    private function initInvestments()
     {
         foreach ($this->investments as &$investment) {
             $investment['mpr'] = $investment['apr'] / 12;
@@ -33,7 +33,7 @@ class Outlook
         }
     }
 
-    public function initLoans()
+    private function initLoans()
     {
         foreach ($this->loans as &$loan) {
             $loan['mpr'] = $loan['apr'] / 12;
@@ -43,19 +43,19 @@ class Outlook
         }
     }
 
-    public function payExpenses()
+    private function payExpenses()
     {
         foreach ($this->expenses as $expense) {
             $this->income -= $expense;
         }
     }
 
-    public function calculateInterest($amount, $rate) 
+    private function calculateInterest($amount, $rate) 
     {
         return $rate / 100 * $amount;
     }
 
-    public function accrueInterest($account)
+    private function accrueInterest($account)
     {
         $interest = $this->calculateInterest($loan['balance'], $loan['mpr']);
 
@@ -64,7 +64,7 @@ class Outlook
         $account['balance'] += $interest;
     }
 
-    public function payLoans() 
+    private function payLoans() 
     {
         foreach ($this->loans as &$loan) {
 
@@ -78,14 +78,14 @@ class Outlook
         }
     }
 
-    public function payRaise()
+    private function payRaise()
     {
         $raise = $this->calculateInterest($this->original_income, $this->raise);
 
         $this->original_income += $raise;
     }
 
-    public function makeInvestments()
+    private function makeInvestments()
     {
         foreach ($this->investments as &$investment) {
 
@@ -96,7 +96,7 @@ class Outlook
 
     }
 
-    public function outlook()
+    private function outlook()
     {
         for ($i = 0; $i < $this->months; $i++) {
 
@@ -121,7 +121,7 @@ class Outlook
         }
     }
 
-    public function &worstLoan()
+    private function &worstLoan()
     {
         $apr = 0;
         $worst_loan;
@@ -135,7 +135,7 @@ class Outlook
         return $worst_loan;
     }
 
-    public function &bestInvestment()
+    private function &bestInvestment()
     {
         $apr = 0;
         $best_investment;
@@ -149,7 +149,7 @@ class Outlook
         return $best_investment;
     }
 
-    public function paymentTo(&$account, $amount)
+    private function paymentTo(&$account, $amount)
     {
         $payment = $amount;
 
@@ -165,7 +165,7 @@ class Outlook
         return abs($amount) - abs($payment);
     }
 
-    public function invest(&$account, $amount)
+    private function invest(&$account, $amount)
     {
         $this->income -= $amount;
         $account['balance'] += $amount;
@@ -174,7 +174,7 @@ class Outlook
         return 0;
     }
 
-    public function handleSurplusIncome()
+    private function handleSurplusIncome()
     {
         if ($account = &$this->worstLoan() !== null) {
             $remainder = $this->paymentTo($account, $this->income * -1);
