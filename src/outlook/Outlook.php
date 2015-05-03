@@ -7,9 +7,6 @@ use Carbon\Carbon;
 
 class Outlook
 {
-    public $surplus = 0;
-    public $history = [];
-
     public function __construct($months)
     {
         date_default_timezone_set('UTC');
@@ -21,6 +18,7 @@ class Outlook
         $this->expenses = $yaml['expenses'];
         $this->investments = $yaml['investments'];
         $this->loans = $yaml['loans'];
+        $this->surplus = 0;
 
         $this->initInvestments();
         $this->initLoans();
@@ -45,74 +43,79 @@ class Outlook
         }
     }
 
+    public function payExpenses()
+    {
+        foreach ($this->expenses as $expense) {
+            $this->income -= $expense;
+        }
+    }
+
+    public function calculateInterest($amount, $rate) 
+    {
+        return $rate / 100 * $amount;
+    }
+
+    public function accrueInterest($account)
+    {
+        $interest = $this->calculateInterest($loan['balance'], $loan['mpr']);
+
+        $account['total_interest'] += $interest;
+
+        $account['balance'] += $interest;
+    }
+
+    public function payLoans() 
+    {
+        foreach ($this->loans as &$loan) {
+
+            if ($loan['balance'] <= 0) {
+                continue;
+            }
+
+            $this->accrueInterest($loan);
+
+            $this->paymentTo($loan, $loan['payment'] * -1, $loan_history);
+        }
+    }
+
+    public function payRaise()
+    {
+        $raise = $this->calculateInterest($this->original_income, $this->raise);
+
+        $this->original_income += $raise;
+    }
+
+    public function makeInvestments()
+    {
+        foreach ($this->investments as &$investment) {
+
+            $this->accrueInterest($investment);
+
+            $this->invest($investment, $investment['contribution'], $investment_history);
+        }
+
+    }
+
     public function outlook()
     {
         for ($i = 0; $i < $this->months; $i++) {
-            $this->date = $this->carbon->toDateString();
-            $this_day_in_history = [];
 
-            // Pay Raise Once A Year
+            $this->date = $this->carbon->toDateString();
+
+
             if ($i > 0 && $i % 12 == 0) {
-                $this->original_income += $this->original_income * $this->raise / 100;
-                $this_day_in_history['pay_raise'] = $this->original_income;
+                $this->payRaise();
             }
 
             $this->income = $this->original_income;
 
-            // pay expenses
-            foreach ($this->expenses as $expense) {
-                $this->income -= $expense;
-            }
+            $this->payExpenses();
 
-            // pay loans
-            foreach ($this->loans as &$loan) {
-                $loan_history = [
-                    'payment' => 0,
-                ];
+            $this->payLoans();
 
-                if ($loan['balance'] <= 0) {
-                    continue;
-                }
+            $this->makeInvestments();
 
-                // calculate interest
-                $interest = $loan['mpr'] / 100 * $loan['balance'];
-                $loan_history['interest'] = $interest;
-                $loan['total_interest'] += $interest;
-
-                // compound interest
-                $loan['balance'] += $interest;
-                $loan_history['balance'] = $loan['balance'];
-
-                $this->paymentTo($loan, $loan['payment'] * -1, $loan_history);
-
-                $this_day_in_history[$loan['name']] = $loan_history;
-            }
-
-            // make investments
-            foreach ($this->investments as &$investment) {
-                $investment_history = [];
-
-                // calculate interest
-                $interest = $investment['mpr'] / 100 * $investment['balance'];
-                $investment['total_interest'] += $interest;
-                $investment_history['interest'] = $interest;
-
-                // compound interest
-                $investment['balance'] += $interest;
-                $investment_history['balance'] = $investment['balance'];
-
-                $this->invest($investment, $investment['contribution'], $investment_history);
-
-                $this_day_in_history[$investment['name']] = $investment_history;
-            }
-
-            $this_day_in_history['surplus'] = [
-                'balance' => $this->income 
-            ];
-
-            $this->history[$this->date] = $this_day_in_history;
-
-            $this->handleSurplusIncome($this->income);
+            $this->handleSurplusIncome();
 
             $this->carbon->addMonth();
         }
@@ -146,7 +149,7 @@ class Outlook
         return $best_investment;
     }
 
-    public function paymentTo(&$account, $amount, &$history)
+    public function paymentTo(&$account, $amount)
     {
         $payment = $amount;
 
@@ -158,89 +161,38 @@ class Outlook
         $this->income -= abs($payment);
         $account['balance'] += $payment;
         $account['total_payments'] += abs($payment);
-        $history['balance'] = $account['balance'];
-        $history['payment'] += abs($payment);
 
         return abs($amount) - abs($payment);
     }
 
-    public function invest(&$account, $amount, &$history)
+    public function invest(&$account, $amount)
     {
         $this->income -= $amount;
         $account['balance'] += $amount;
         $account['total_payments'] += $amount;
-        $history['balance'] = $account['balance'];
-        $history['payment'] += $amount;
 
         return 0;
     }
 
-    public function handleSurplusIncome($surplus_income)
+    public function handleSurplusIncome()
     {
         if ($account = &$this->worstLoan() !== null) {
-            $remainder = $this->paymentTo($account, $surplus_income * -1, $this->history[$this->date][$account['name']]);
+            $remainder = $this->paymentTo($account, $this->income * -1);
             if ($remainder > 0) {
                 $this->handleSurplusIncome($remainder);
             }
         } elseif ($account = &$this->bestInvestment() !== null) {
-            $remainder = $this->invest($account, $surplus_income, $this->history[$this->date][$account['name']]);
+            $remainder = $this->invest($account, $this->income);
             if ($remainder > 0) {
                 $this->handleSurplusIncome($remainder);
             }
         } else {
-            $this->surplus += $surplus_income;
+            $this->surplus += $this->income;
         }
     }
 
     public function __toString()
     {
-        $string = '';
-
-        // Add history
-        foreach($this->history as $date => $month) {
-            $string .= $date . "\n";
-            foreach($month as $name => $account) {
-                $string .= "\n\t" . $name . ":\n\t\t";
-                foreach($account as $key => $value) {
-                    $string .= sprintf("\t%s: $%'#6.2f", $key, $value);
-                }
-                $string .= "\n";
-            }
-
-            $string .= "----------------------------------------------------------------------------------------------------------------------\n\n";
-        }
-
-        // Add income
-        $string .= "Income:\t\t".$this->original_income."\n";
-
-        // Add surplus
-        $string .= "Surplus:\t".$this->surplus."\n";
-
-        // Add loans
-        $string .= "Loans:\n";
-        foreach ($this->loans as $loan) {
-            $string .= "\n\tname:\t\t".$loan['name']."\n";
-            $string .= "\tapr:\t\t".$loan['apr']."\n";
-            $string .= "\ttotal payments:\t".$loan['total_payments']."\n";
-            $string .= "\ttotal interest:\t".$loan['total_interest']."\n";
-
-            // loan paid off
-            if (array_key_exists('paid_off', $loan)) {
-                $string .= "\tstatus:\t\tPaid off on ".$loan['paid_off']."\n";
-            } else {
-                $string .= "\tbalance:\t".$loan['balance']."\n";
-            }
-        }
-
-        // Add investments
-        $string .= "\nInvestments:\n";
-        foreach ($this->investments as $investment) {
-            $string .= "\n\tname:\t\t".$investment['name']."\n";
-            $string .= "\tapr:\t\t".$investment['apr']."\n";
-            $string .= "\tbalance:\t".$investment['balance']."\n";
-        }
-
-        return $string;
-        //return print_r($this->history, true);
+        return print_r($this, true);
     }
 }
